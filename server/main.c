@@ -18,7 +18,7 @@
 
 int buffer_socket_descriptor;
 int amount_of_water = 0;
-int amount_of_milk= 0;
+int amount_of_milk = 0;
 int amount_of_coffee = 0;
 
 #define SAFE_RUN(func)                   \
@@ -28,13 +28,11 @@ int amount_of_coffee = 0;
             } while (0)
 
 struct state {
-
     void (*enter)();
 
     void (*process)();
 
     void (*exit)();
-
 };
 
 struct state state_table[NUMBER_OF_STATES] = {
@@ -48,7 +46,7 @@ struct state state_table[NUMBER_OF_STATES] = {
         {
                 NULL,
                 process_waiting_for_commands_event,
-                exit_waiting_for_commands_state
+                NULL
         },
         // GETTING COFFEE TYPE STATE
         {
@@ -96,6 +94,19 @@ struct state state_table[NUMBER_OF_STATES] = {
 
 int state = OFF;
 
+struct coffee {
+    char *name;
+    int water;
+    int coffee;
+    int milk;
+};
+
+struct coffee recipes[5] = {{"ESPRESSO",   50,  5,  0},
+                            {"AMERICANO",  150, 15, 0},
+                            {"CAPPUCCINO", 150, 20, 50},
+                            {"LATTE",      150, 20, 100},
+                            {"RAF",        150, 20, 150}};
+
 int main() {
     int server_descriptor = socket(AF_INET, SOCK_STREAM, 0);;
     if (server_descriptor == -1) {
@@ -112,7 +123,6 @@ int main() {
     while (bind(server_descriptor, (struct sockaddr *) &server_info, sizeof(server_info)) == -1) {
         printf("Error while binding\n");
         sleep(1);
-        return 1;
     }
 
     if (listen(server_descriptor, BACKLOG) == -1) {
