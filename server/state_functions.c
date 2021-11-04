@@ -71,11 +71,22 @@ void exit_getting_coffee_type_state() {
         state = CHECKING;
 }
 
-void enter_waiting_for_recipe_state() {}
+void enter_waiting_for_recipe_state() {
+    send_message(buffer_socket_descriptor, "Enter recipe (amount of water, coffee, milk):\n");
+}
 
-void process_waiting_for_recipe_event() {}
+void process_waiting_for_recipe_event() {
+    char_auto_ptr message = get_message(buffer_socket_descriptor);
+    current_water = atoi(message);
+    char *current_space = strchr(message, ' ');
+    current_coffee = atoi(current_space);
+    current_space = strchr(current_space, ' ');
+    current_milk= atoi(current_space);
+}
 
-void exit_waiting_for_recipe_state() {}
+void exit_waiting_for_recipe_state() {
+    state = CHECKING;
+}
 
 void process_checking_event() {}
 
