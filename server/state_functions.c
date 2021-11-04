@@ -7,6 +7,11 @@ extern int buffer_socket_descriptor;
 extern int amount_of_water;
 extern int amount_of_milk;
 extern int amount_of_coffee;
+extern struct coffee recipes[5];
+
+int current_water = 0;
+int current_milk = 0;
+int current_coffee = 0;
 
 FILE *setting_file;
 
@@ -45,10 +50,25 @@ void enter_getting_coffee_type_state() {
     send_message(buffer_socket_descriptor, "MENU:\nESPRESSO\nAMERICANO\nCAPPUCCINO\nLATTE\nRAF\n");
 }
 
-void process_getting_coffee_type_event() {}
+void process_getting_coffee_type_event() {
+    char_auto_ptr message = get_message(buffer_socket_descriptor);
+    for (int i = 0; i < 5; ++i) {
+        if (strncmp(message, recipes[i].name, strlen(recipes[i].name)) == 0) {
+            current_water = recipes[i].water;
+            current_coffee = recipes[i].coffee;
+            current_milk = recipes[i].milk;
+            return;
+        }
+    }
+    current_water = -1;
+    return;
+}
 
 void exit_getting_coffee_type_state() {
-
+    if (current_water == -1)
+        state = WAITING_FOR_RECIPE;
+    else
+        state = CHECKING;
 }
 
 void enter_waiting_for_recipe_state() {}
