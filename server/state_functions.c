@@ -1,8 +1,4 @@
-#include <stdlib.h>
 #include "state_functions.h"
-#include "char_reading.h"
-#include "chat_functions.h"
-#include "asprintf.h"
 
 extern int state;
 extern int buffer_socket_descriptor;
@@ -61,8 +57,14 @@ struct state state_table[NUMBER_OF_STATES] = {
                 NULL,
                 process_off_event,
                 exit_off_state
-        }};
-
+        },
+        // COUNTING RESOURCES STATE
+        {
+                NULL,
+                process_count_resources_event,
+                exit_count_resources_state
+        }
+};
 
 struct coffee recipes[5] = {{"ESPRESSO",   50,  5,  0},
                             {"AMERICANO",  150, 15, 0},
@@ -81,7 +83,7 @@ int lack_of_resources = 0;
 char *message;
 FILE *setting_file;
 
-void print_state_name (int i) {
+void print_state_name(int i) {
     switch (i) {
         case 0: {
             printf("TURNING ON\n");
@@ -119,6 +121,14 @@ void print_state_name (int i) {
             printf("OFF\n");
             break;
         }
+        case 9: {
+            printf("COUNTING RESOURCES\n");
+            break;
+        }
+        case -1: {
+            printf("ERROR\n");
+            break;
+        }
         default:
             printf("UNKNOWN STATE\n");
     }
@@ -145,7 +155,7 @@ void exit_turning_on_state() {
 }
 
 void process_waiting_for_commands_event() {
-    message = get_message(buffer_socket_descriptor);
+    SAFE_GET(buffer_socket_descriptor, message);
 }
 
 void exit_waiting_for_commands_state() {
@@ -161,16 +171,29 @@ void exit_waiting_for_commands_state() {
         state = TURNING_OFF;
         return;
     }
-    send_message(buffer_socket_descriptor, "UNKNOWN COMMAND\n");
+    if (strncmp(message, "RESOURCES", 9) == 0) {
+        state = COUNTING_RESOURCES;
+        return;
+    }
+    if (strncmp(message, "ADD", 3) == 0) {
+        state = WAITING_FOR_RESOURCES;
+        current_water = -1;
+        return;
+    }
+    SAFE_SEND(buffer_socket_descriptor, "UNKNOWN COMMAND\n");
     state = WAITING_FOR_COMMANDS;
 }
 
 void enter_getting_coffee_type_state() {
-    send_message(buffer_socket_descriptor, "MENU:\nESPRESSO\nAMERICANO\nCAPPUCCINO\nLATTE\nRAF\n");
+    SAFE_SEND(buffer_socket_descriptor, "MENU:\nESPRESSO\nAMERICANO\nCAPPUCCINO\nLATTE\nRAF\n");
 }
 
 void process_getting_coffee_type_event() {
-    message = get_message(buffer_socket_descriptor);
+    SAFE_GET(buffer_socket_descriptor, message);
+    if (strncmp(message, "OFF", 3) == 0) {
+        current_water = 0;
+        return;
+    }
     for (int i = 0; i < 5; ++i) {
         if (strncmp(message, recipes[i].name, strlen(recipes[i].name)) == 0) {
             current_water = recipes[i].water;
@@ -183,18 +206,27 @@ void process_getting_coffee_type_event() {
 }
 
 void exit_getting_coffee_type_state() {
-    if (current_water == -1)
+    if (current_water == -1) {
         state = WAITING_FOR_RECIPE;
-    else
-        state = CHECKING;
+        return;
+    }
+    if (current_water == 0) {
+        state = TURNING_OFF;
+        return;
+    }
+    state = CHECKING;
 }
 
 void enter_waiting_for_recipe_state() {
-    send_message(buffer_socket_descriptor, "Enter recipe (amount of water, coffee, milk):\n");
+    SAFE_SEND(buffer_socket_descriptor, "Enter recipe (amount of water, coffee, milk):\n");
 }
 
 void process_waiting_for_recipe_event() {
-    message = get_message(buffer_socket_descriptor);
+    SAFE_GET(buffer_socket_descriptor, message);
+    if (strncmp(message, "OFF", 3) == 0) {
+        current_water = 0;
+        return;
+    }
     current_water = atoi(message);
     char *current_space = strchr(message, ' ');
     current_coffee = atoi(current_space);
@@ -203,15 +235,44 @@ void process_waiting_for_recipe_event() {
 }
 
 void exit_waiting_for_recipe_state() {
-    state = CHECKING;
+    if (current_water == 0)
+        state = TURNING_OFF;
+    else
+        state = CHECKING;
 }
 
 void process_checking_event() {
     lack_of_resources =
             current_coffee > coffee_in_machine || current_milk > milk_in_machine || current_water > water_in_machine;
+    if (!lack_of_resources) {
+        return;
+    }
+    free(message);
+    message = "";
+    if (asprintf(&message,
+                 "Not enough resources for this coffee\nYou have:     %3d ml of water, %3d g of coffee, %3d ml of milk\nCoffee needs: %3d ml of water, %3d g of coffee, %3d ml of milk\nDo you want to add them (1) or choose another coffee (2)?",
+                 water_in_machine, coffee_in_machine, milk_in_machine,
+                 current_water, current_coffee, current_milk) == 0) {
+        state = -1;
+        return;
+    }
+    SAFE_SEND(buffer_socket_descriptor, message);
+    SAFE_GET(buffer_socket_descriptor, message);
+    if (strncmp(message, "OFF", 3) == 0)
+        current_water = 0;
+    if (atoi(message) == 2)
+        current_water = 1;
 }
 
 void exit_checking_state() {
+    if (current_water == 0) {
+        state = TURNING_OFF;
+        return;
+    }
+    if (current_water == 1) {
+        state = GETTING_COFFEE_TYPE;
+        return;
+    }
     state = lack_of_resources ? WAITING_FOR_RESOURCES : MAKING_COFFEE;
 }
 
@@ -219,7 +280,7 @@ void process_making_coffee_event() {
     water_in_machine -= current_water;
     milk_in_machine -= current_milk;
     coffee_in_machine -= current_coffee;
-    send_message(buffer_socket_descriptor, "Take your coffee\n");
+    SAFE_SEND(buffer_socket_descriptor, "Take your coffee\n");
 }
 
 void exit_making_coffee_state() {
@@ -227,12 +288,12 @@ void exit_making_coffee_state() {
 }
 
 void process_waiting_for_resources_event() {
-    message = "";
-    asprintf(&message,
-             "Not enough resources for this coffee\nYou have:     %3d ml of water, %3d g of coffee, %3d ml of milk\nCoffee needs: %3d ml of water, %3d g of coffee, %3d ml of milk\n",
-             water_in_machine, coffee_in_machine, milk_in_machine, current_water, current_coffee, current_milk);
-    send_message(buffer_socket_descriptor, message);
-    message = get_message(buffer_socket_descriptor);
+    SAFE_SEND(buffer_socket_descriptor, "ADD RESOURCES:\n");
+    SAFE_GET(buffer_socket_descriptor, message);
+    if (strncmp(message, "OFF", 3) == 0) {
+        current_water = 0;
+        return;
+    }
     char *space = strchr(message, ' ');
     int amount = atoi(space);
     if (strncmp(message, "WATER", 5) == 0)
@@ -241,15 +302,19 @@ void process_waiting_for_resources_event() {
         coffee_in_machine += amount;
     if (strncmp(message, "MILK", 4) == 0)
         milk_in_machine += amount;
-    if (strncmp(message, "OFF", 3) == 0)
-        current_water = 0;
 }
 
 void exit_waiting_for_resources_state() {
-    if (current_water == 0)
+    if (current_water == 0) {
         state = TURNING_OFF;
-    else
-        state = CHECKING;
+        return;
+    }
+    if (current_water == -1) {
+        SAFE_SEND(buffer_socket_descriptor, "");
+        state = WAITING_FOR_COMMANDS;
+        return;
+    }
+    state = CHECKING;
 }
 
 void enter_turning_off_state() {
@@ -257,7 +322,7 @@ void enter_turning_off_state() {
 }
 
 void process_turning_off_event() {
-    send_message(buffer_socket_descriptor, "");
+    SAFE_SEND(buffer_socket_descriptor, "COFFEE MACHINE TURNED OFF\n");
     fprintf(setting_file, "%d %d %d", water_in_machine, coffee_in_machine, milk_in_machine);
 }
 
@@ -267,15 +332,28 @@ void exit_turning_off_state() {
 }
 
 void process_off_event() {
-    message = get_message(buffer_socket_descriptor);
+    SAFE_GET(buffer_socket_descriptor, message);
     while (strncmp(message, "ON", 2) != 0) {
-        send_message(buffer_socket_descriptor, "COFFEE MACHINE IS OFF");
-        message = get_message(buffer_socket_descriptor);
+        SAFE_SEND(buffer_socket_descriptor, "COFFEE MACHINE IS OFF");
+        SAFE_GET(buffer_socket_descriptor, message);
     }
-    send_message(buffer_socket_descriptor, "COFFEE MACHINE IS ON!");
+    SAFE_SEND(buffer_socket_descriptor, "COFFEE MACHINE IS ON!");
 }
 
 void exit_off_state() {
     free(message);
     state = TURNING_ON;
+}
+
+void process_count_resources_event() {
+    free(message);
+    message = "";
+    asprintf(&message,
+             "You have: %3dml of water, %3dg of coffee, %3dml of milk\n",
+             water_in_machine, coffee_in_machine, milk_in_machine);
+    SAFE_SEND(buffer_socket_descriptor, message);
+}
+
+void exit_count_resources_state() {
+    state = WAITING_FOR_COMMANDS;
 }

@@ -1,9 +1,12 @@
 // Sofa Sergeeva
 //
-// Create database with server-client system
+// Create coffee machine with server-client system
 //
 // To compile program use command:
+// gcc main.c char_reading.c chat_functions.c state_functions.c
 //
+// This program need to be run before client for correct work
+
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -22,6 +25,7 @@ int state = OFF;
 extern struct state state_table[NUMBER_OF_STATES];
 
 int main() {
+    // Creating server socket
     int server_descriptor = socket(AF_INET, SOCK_STREAM, 0);;
     if (server_descriptor == -1) {
         printf("Error while creating socket");
@@ -55,13 +59,15 @@ int main() {
         exit(1);
     }
 
-    while (state != -1) {
+    // Running coffee machine until error happens
+    while (1) {
         print_state_name(state);
         SAFE_RUN(state_table[state].enter);
         SAFE_RUN(state_table[state].process);
         SAFE_RUN(state_table[state].exit);
     }
 
+    printf("ERROR HAPPENED\n");
     close(buffer_socket_descriptor);
     close(server_descriptor);
     return 0;

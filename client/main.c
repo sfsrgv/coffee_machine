@@ -1,9 +1,9 @@
 // Sofa Sergeeva
 //
-// Create database with server-client system
+// Create coffee machine with server-client system
 //
 // To compile program use command:
-// gcc main.c chat_functions.c char_reading.c command.c database.c -lpthread
+// gcc main.c chat_functions.c char_reading.c
 //
 // This program need to be run after server for correct work
 
@@ -20,7 +20,6 @@
 #include "socket_constants.h"
 #include "chat_functions.h"
 #include "char_reading.h"
-#include "command.h"
 
 int main() {
     srand(time(NULL));
@@ -52,9 +51,9 @@ int main() {
             printf("ERROR WHILE READING COMMAND\n");
             break;
         }
-        if (send_message(client_descriptor, command) == END)
+        if (send_message(client_descriptor, command) == ERROR)
             break;
-        if (get_message(client_descriptor) == END)
+        if (get_message(client_descriptor) == ERROR)
             break;
     }
     close(client_descriptor);

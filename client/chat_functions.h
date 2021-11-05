@@ -13,11 +13,8 @@
 
 enum DIALOG_STATUS {
     CONTINUE,
-    END
+    ERROR
 };
-
-// Returns time in format yyyy.mm.dd hh:mm:ss
-char *get_time();
 
 // Sending messages
 int send_message(int socket_descriptor, char* message);
