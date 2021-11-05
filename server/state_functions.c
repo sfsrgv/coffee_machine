@@ -6,9 +6,63 @@
 
 extern int state;
 extern int buffer_socket_descriptor;
-extern int water_in_machine;
-extern int milk_in_machine;
-extern int coffee_in_machine;
+
+struct state state_table[NUMBER_OF_STATES] = {
+        // TURNING ON STATE
+        {
+                enter_turning_on_state,
+                process_turning_on_event,
+                exit_turning_on_state
+        },
+        // WAITING FOR COMMANDS STATE
+        {
+                NULL,
+                process_waiting_for_commands_event,
+                exit_waiting_for_commands_state
+        },
+        // GETTING COFFEE TYPE STATE
+        {
+                enter_getting_coffee_type_state,
+                process_getting_coffee_type_event,
+                exit_getting_coffee_type_state
+        },
+        // CHECKING STATE
+        {
+                NULL,
+                process_checking_event,
+                exit_checking_state
+        },
+        // WAITING FOR RESOURCES STATE
+        {
+                NULL,
+                process_waiting_for_resources_event,
+                exit_waiting_for_resources_state
+        },
+        // MAKING COFFEE STATE
+        {
+                NULL,
+                process_making_coffee_event,
+                exit_making_coffee_state
+        },
+        // WAITING FOR RECIPE STATE
+        {
+                enter_waiting_for_recipe_state,
+                process_waiting_for_recipe_event,
+                exit_waiting_for_recipe_state
+        },
+        // TURNING OFF STATE
+        {
+                enter_turning_off_state,
+                process_turning_off_event,
+                exit_turning_off_state
+        },
+        // OFF STATE
+        {
+                NULL,
+                process_off_event,
+                exit_off_state
+        }};
+
 
 struct coffee recipes[5] = {{"ESPRESSO",   50,  5,  0},
                             {"AMERICANO",  150, 15, 0},
@@ -19,11 +73,56 @@ struct coffee recipes[5] = {{"ESPRESSO",   50,  5,  0},
 int current_water = 0;
 int current_milk = 0;
 int current_coffee = 0;
+int water_in_machine = 0;
+int milk_in_machine = 0;
+int coffee_in_machine = 0;
 int lack_of_resources = 0;
 
 char *message;
-
 FILE *setting_file;
+
+void print_state_name (int i) {
+    switch (i) {
+        case 0: {
+            printf("TURNING ON\n");
+            break;
+        }
+        case 1: {
+            printf("WAITING FOR COMMANDS\n");
+            break;
+        }
+        case 2: {
+            printf("GETTING COFFEE TYPE\n");
+            break;
+        }
+        case 3: {
+            printf("CHECKING\n");
+            break;
+        }
+        case 4: {
+            printf("WAITING FOR RESOURCES\n");
+            break;
+        }
+        case 5: {
+            printf("MAKING COFFEE\n");
+            break;
+        }
+        case 6: {
+            printf("WAITING FOR RECIPE\n");
+            break;
+        }
+        case 7: {
+            printf("TURNING OFF\n");
+            break;
+        }
+        case 8: {
+            printf("OFF\n");
+            break;
+        }
+        default:
+            printf("UNKNOWN STATE\n");
+    }
+}
 
 void enter_turning_on_state() {
     setting_file = fopen("settings.txt", "r");
@@ -62,7 +161,7 @@ void exit_waiting_for_commands_state() {
         state = TURNING_OFF;
         return;
     }
-    send_message(buffer_socket_descriptor, "Unknown command\n");
+    send_message(buffer_socket_descriptor, "UNKNOWN COMMAND\n");
     state = WAITING_FOR_COMMANDS;
 }
 
@@ -130,7 +229,7 @@ void exit_making_coffee_state() {
 void process_waiting_for_resources_event() {
     message = "";
     asprintf(&message,
-             "Not enough resources for this coffee\nYou have: %d ml of water, %d g of coffee, %d ml of milk\nCoffee needs: %d ml of water, %d g of coffee, %d ml of milk\n",
+             "Not enough resources for this coffee\nYou have:     %3d ml of water, %3d g of coffee, %3d ml of milk\nCoffee needs: %3d ml of water, %3d g of coffee, %3d ml of milk\n",
              water_in_machine, coffee_in_machine, milk_in_machine, current_water, current_coffee, current_milk);
     send_message(buffer_socket_descriptor, message);
     message = get_message(buffer_socket_descriptor);
@@ -142,10 +241,15 @@ void process_waiting_for_resources_event() {
         coffee_in_machine += amount;
     if (strncmp(message, "MILK", 4) == 0)
         milk_in_machine += amount;
+    if (strncmp(message, "OFF", 3) == 0)
+        current_water = 0;
 }
 
 void exit_waiting_for_resources_state() {
-    state = CHECKING;
+    if (current_water == 0)
+        state = TURNING_OFF;
+    else
+        state = CHECKING;
 }
 
 void enter_turning_off_state() {

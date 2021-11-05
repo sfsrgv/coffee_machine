@@ -12,12 +12,26 @@
 #define TURNING_OFF 7
 #define OFF 8
 
+#define SAFE_RUN(func)                   \
+            do {                         \
+                if ((func) != NULL)      \
+                   func();               \
+            } while (0)
+
 struct coffee {
     char *name;
     int water;
     int coffee;
     int milk;
 };
+
+struct state {
+    void (*enter)();
+    void (*process)();
+    void (*exit)();
+};
+
+void print_state_name (int i);
 
 void enter_turning_on_state();
 void process_turning_on_event();

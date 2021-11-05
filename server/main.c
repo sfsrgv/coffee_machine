@@ -17,83 +17,9 @@
 #include "state_functions.h"
 
 int buffer_socket_descriptor;
-int water_in_machine = 0;
-int milk_in_machine = 0;
-int coffee_in_machine = 0;
-
-#define SAFE_RUN(func)                   \
-            do {                         \
-                if ((func) != NULL)      \
-                   func();               \
-            } while (0)
-
-struct state {
-    void (*enter)();
-
-    void (*process)();
-
-    void (*exit)();
-};
-
-struct state state_table[NUMBER_OF_STATES] = {
-        // TURNING ON STATE
-        {
-                enter_turning_on_state,
-                process_turning_on_event,
-                exit_turning_on_state
-        },
-        // WAITING FOR COMMANDS ON STATE
-        {
-                NULL,
-                process_waiting_for_commands_event,
-                exit_waiting_for_commands_state
-        },
-        // GETTING COFFEE TYPE STATE
-        {
-                enter_getting_coffee_type_state,
-                process_getting_coffee_type_event,
-                exit_getting_coffee_type_state
-        },
-        // CHECKING STATE
-        {
-                NULL,
-                process_checking_event,
-                exit_checking_state
-        },
-        // WAITING FOR RESOURCES STATE
-        {
-                NULL,
-                process_waiting_for_resources_event,
-                exit_waiting_for_resources_state
-        },
-        // MAKING COFFEE
-        {
-                NULL,
-                process_making_coffee_event,
-                exit_making_coffee_state
-        },
-        // WAITING FOR RECIPE
-        {
-                enter_waiting_for_recipe_state,
-                process_waiting_for_recipe_event,
-                exit_waiting_for_recipe_state
-        },
-        // TURNING OFF STATE
-        {
-                enter_turning_off_state,
-                process_turning_off_event,
-                exit_turning_off_state
-        },
-        // OFF STATE
-        {
-                NULL,
-                process_off_event,
-                exit_off_state
-        }};
-
-
 int state = OFF;
 
+extern struct state state_table[NUMBER_OF_STATES];
 
 int main() {
     int server_descriptor = socket(AF_INET, SOCK_STREAM, 0);;
@@ -130,11 +56,12 @@ int main() {
     }
 
     while (state != -1) {
-        printf("state = %d\n", state);
+        print_state_name(state);
         SAFE_RUN(state_table[state].enter);
         SAFE_RUN(state_table[state].process);
         SAFE_RUN(state_table[state].exit);
     }
+
     close(buffer_socket_descriptor);
     close(server_descriptor);
     return 0;
