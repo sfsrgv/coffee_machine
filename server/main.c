@@ -17,9 +17,9 @@
 #include "state_functions.h"
 
 int buffer_socket_descriptor;
-int amount_of_water = 0;
-int amount_of_milk = 0;
-int amount_of_coffee = 0;
+int water_in_machine = 0;
+int milk_in_machine = 0;
+int coffee_in_machine = 0;
 
 #define SAFE_RUN(func)                   \
             do {                         \
@@ -46,7 +46,7 @@ struct state state_table[NUMBER_OF_STATES] = {
         {
                 NULL,
                 process_waiting_for_commands_event,
-                NULL
+                exit_waiting_for_commands_state
         },
         // GETTING COFFEE TYPE STATE
         {
@@ -94,18 +94,6 @@ struct state state_table[NUMBER_OF_STATES] = {
 
 int state = OFF;
 
-struct coffee {
-    char *name;
-    int water;
-    int coffee;
-    int milk;
-};
-
-struct coffee recipes[5] = {{"ESPRESSO",   50,  5,  0},
-                            {"AMERICANO",  150, 15, 0},
-                            {"CAPPUCCINO", 150, 20, 50},
-                            {"LATTE",      150, 20, 100},
-                            {"RAF",        150, 20, 150}};
 
 int main() {
     int server_descriptor = socket(AF_INET, SOCK_STREAM, 0);;
@@ -120,8 +108,9 @@ int main() {
     server_info.sin_addr.s_addr = IP_ADDRESS;
     server_info.sin_port = PORT_NUMBER;
 
+    int i = 1;
     while (bind(server_descriptor, (struct sockaddr *) &server_info, sizeof(server_info)) == -1) {
-        printf("Error while binding\n");
+        printf("%d: Error while binding\n", i++);
         sleep(1);
     }
 

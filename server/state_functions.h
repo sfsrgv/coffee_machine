@@ -12,11 +12,19 @@
 #define TURNING_OFF 7
 #define OFF 8
 
+struct coffee {
+    char *name;
+    int water;
+    int coffee;
+    int milk;
+};
+
 void enter_turning_on_state();
 void process_turning_on_event();
 void exit_turning_on_state();
 
 void process_waiting_for_commands_event();
+void exit_waiting_for_commands_state();
 
 void enter_getting_coffee_type_state();
 void process_getting_coffee_type_event();
